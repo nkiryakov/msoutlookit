@@ -253,7 +253,7 @@ export default function App() {
           {boss || source === 'live'
             ? 'All folders are up to date.'
             : source === 'fallback'
-              ? 'Folder unavailable, showing r/all'
+              ? 'Connected (direct JSON feed)'
               : 'Working Offline (showing cached items)'}
           <span className="status-sep" />
           Connected to: Microsoft Exchange

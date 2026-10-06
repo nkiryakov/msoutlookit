@@ -20,7 +20,7 @@ export default function FolderPane({ folders, current, onSelect, onAdd, onRemove
         type="button"
         className={`folder${current === sub ? ' selected' : ''}`}
         onClick={() => onSelect(sub)}
-        title={sub ? `r/${sub}` : 'Front page'}
+        title={sub ? `r/${sub}` : 'r/all'}
       >
         <Icon name={icon} size={15} />
         <span className="folder-name">{label}</span>

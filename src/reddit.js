@@ -27,41 +27,84 @@ async function fetchJson(url) {
   throw lastError;
 }
 
+// The Inbox is Reddit's homepage, i.e. r/all.
+const HOME = 'all';
+
+// Preferred listing URL: raw_json=1 returns unescaped HTML and titles.
 function listingUrl(subreddit, sort, after) {
-  const path = subreddit ? `/r/${encodeURIComponent(subreddit)}/${sort}.json` : `/${sort}.json`;
   const params = new URLSearchParams({ limit: '30', raw_json: '1' });
   if (sort === 'top') params.set('t', 'day');
   if (after) params.set('after', after);
-  return `${REDDIT}${path}?${params}`;
+  return `${REDDIT}/r/${encodeURIComponent(subreddit || HOME)}/${sort}.json?${params}`;
 }
 
-// Direct JSON feed used when the requested folder can't be loaded.
-export const FALLBACK_FEED = `${REDDIT}/r/all/hot.json?limit=25`;
+// Fallback: the plain JSON feed for the same folder and sort, e.g.
+// https://www.reddit.com/r/all/hot.json?limit=25 for the Inbox sorted by Hot.
+export function fallbackFeedUrl(subreddit, sort, after) {
+  const url = `${REDDIT}/r/${encodeURIComponent(subreddit || HOME)}/${sort}.json?limit=25`;
+  return after ? `${url}&after=${encodeURIComponent(after)}` : url;
+}
 
-function parseListing(data) {
+// Without raw_json, Reddit HTML-escapes titles and bodies, and *_html fields
+// are escaped twice. Decoding once restores what raw_json would return.
+function decodeEntities(text) {
+  if (!text || !text.includes('&')) return text;
+  const el = document.createElement('textarea');
+  el.innerHTML = text;
+  return el.value;
+}
+
+function unescapePost(p) {
   return {
-    posts: data.data.children.filter((c) => c.kind === 't3').map((c) => toEmail(c.data)),
+    ...p,
+    title: decodeEntities(p.title),
+    selftext: decodeEntities(p.selftext),
+    selftext_html: decodeEntities(p.selftext_html),
+    url: decodeEntities(p.url),
+  };
+}
+
+function unescapeComment(c) {
+  if (!c || c.kind !== 't1') return c;
+  const d = c.data;
+  return {
+    ...c,
+    data: {
+      ...d,
+      body: decodeEntities(d.body),
+      body_html: decodeEntities(d.body_html),
+      replies: d.replies && d.replies.data
+        ? { ...d.replies, data: { ...d.replies.data, children: d.replies.data.children.map(unescapeComment) } }
+        : d.replies,
+    },
+  };
+}
+
+function parseListing(data, raw) {
+  return {
+    posts: data.data.children
+      .filter((c) => c.kind === 't3')
+      .map((c) => toEmail(raw ? c.data : unescapePost(c.data))),
     after: data.data.after,
   };
 }
 
 // Returns { posts, after, source } where source is:
-//   'live'     - the requested folder loaded from Reddit
-//   'fallback' - the folder failed, so r/all/hot.json was shown instead
+//   'live'     - loaded from the preferred raw_json listing
+//   'fallback' - loaded from the plain JSON feed for the same folder and sort
 //   'offline'  - Reddit was unreachable, so bundled sample data is shown
 export async function fetchPosts(subreddit, sort = 'hot', after = null) {
   try {
-    return { ...parseListing(await fetchJson(listingUrl(subreddit, sort, after))), source: 'live' };
+    return { ...parseListing(await fetchJson(listingUrl(subreddit, sort, after)), true), source: 'live' };
   } catch (err) {
-    console.warn('Could not load folder, trying r/all feed:', err);
+    console.warn('Listing failed, trying plain JSON feed:', err);
   }
-  if (after) return { posts: [], after: null, source: 'offline' };
   try {
-    // The fallback feed is a single page, so pagination is disabled.
-    return { ...parseListing(await fetchJson(FALLBACK_FEED)), after: null, source: 'fallback' };
+    return { ...parseListing(await fetchJson(fallbackFeedUrl(subreddit, sort, after)), false), source: 'fallback' };
   } catch (err) {
     console.warn('Falling back to sample data:', err);
   }
+  if (after) return { posts: [], after: null, source: 'offline' };
   const posts = samplePosts
     .filter((p) => !subreddit || p.subreddit.toLowerCase() === subreddit.toLowerCase())
     .map(toEmail);
@@ -69,14 +112,21 @@ export async function fetchPosts(subreddit, sort = 'hot', after = null) {
 }
 
 export async function fetchComments(post) {
-  if (post.offline) return (sampleComments[post.id] || []).map(toComment).filter(Boolean);
+  const sample = () => (sampleComments[post.id] || []).map(toComment).filter(Boolean);
+  if (post.offline) return sample();
+  const base = `${REDDIT}/r/${post.subreddit}/comments/${post.id}.json`;
   try {
-    const url = `${REDDIT}/r/${post.subreddit}/comments/${post.id}.json?raw_json=1&limit=100&depth=6`;
-    const data = await fetchJson(url);
+    const data = await fetchJson(`${base}?raw_json=1&limit=100&depth=6`);
     return data[1].data.children.map(toComment).filter(Boolean);
   } catch (err) {
+    console.warn('Comments failed, trying plain JSON feed:', err);
+  }
+  try {
+    const data = await fetchJson(`${base}?limit=100`);
+    return data[1].data.children.map(unescapeComment).map(toComment).filter(Boolean);
+  } catch (err) {
     console.warn('Could not load comments:', err);
-    return (sampleComments[post.id] || []).map(toComment).filter(Boolean);
+    return sample();
   }
 }
 

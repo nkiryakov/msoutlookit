@@ -16,7 +16,7 @@ Inspired by Peter Cottle's original MSOutlookit and [Leigh Robert Abbott's moder
 - Draggable Reply, Reply All, Forward and New Email windows. Nothing is actually sent.
 - **Boss key:** press `Esc` to swap everything for a boring inbox of work emails, and press it again to come back
 - Keyboard shortcuts: `j`/`k` or the arrow keys to move between messages, `r` to refresh, `Delete` to hide
-- If a folder can't be loaded, the app falls back to the direct feed `https://www.reddit.com/r/all/hot.json?limit=25`, and the status bar reads "Folder unavailable, showing r/all". If that fails too, it shows bundled sample posts and the status bar reads "Working Offline".
+- The Inbox is Reddit's homepage (`r/all`). Every folder loads `/r/{folder}/{sort}.json`. If that request fails, the app retries the plain JSON feed for the same folder and sort, e.g. `https://www.reddit.com/r/all/hot.json?limit=25` for the Inbox sorted by Hot, or `https://www.reddit.com/r/pics/new.json?limit=25` for Pics sorted by Newest. If that fails too, it shows bundled sample posts and the status bar reads "Working Offline".
 
 ## Development
 
@@ -26,7 +26,7 @@ npm run dev      # http://localhost:5173
 npm run build    # outputs to dist/
 ```
 
-Posts load from Reddit's public JSON endpoints (`/r/{sub}/{sort}.json`, `/comments/{id}.json`). When the browser blocks a direct request with CORS, the app retries through a public CORS proxy (corsproxy.io, then allorigins.win). Post and comment HTML is sanitized with DOMPurify before it is rendered.
+Posts load from Reddit's public JSON endpoints (`/r/{sub}/{sort}.json`, `/r/{sub}/comments/{id}.json`). When the browser blocks a direct request with CORS, the app retries through a public CORS proxy (corsproxy.io, then allorigins.win). Post and comment HTML is sanitized with DOMPurify before it is rendered.
 
 ## Deploying
 
