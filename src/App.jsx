@@ -45,7 +45,7 @@ export default function App() {
   const [posts, setPosts] = useState([]);
   const [after, setAfter] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [offline, setOffline] = useState(false);
+  const [source, setSource] = useState('live');
   const [hidden, setHidden] = useState(() => new Set());
   const [selectedId, setSelectedId] = useState(null);
   const [comments, setComments] = useState([]);
@@ -70,7 +70,7 @@ export default function App() {
     setLoading(true);
     const result = await fetchPosts(sub, sortBy, cursor);
     if (id !== requestId.current) return; // a newer request superseded this one
-    setOffline(result.offline);
+    if (!cursor || result.source !== 'offline') setSource(result.source);
     setPosts((prev) => (cursor ? [...prev, ...result.posts.filter((p) => !prev.some((q) => q.id === p.id))] : result.posts));
     setAfter(result.after);
     setLoading(false);
@@ -250,7 +250,11 @@ export default function App() {
         <span>Items: {boss ? bossEmails.length : visible.length}</span>
         <span>Unread: {boss ? 2 : unread}</span>
         <span className="status-right">
-          {offline && !boss ? 'Working Offline (showing cached items)' : 'All folders are up to date.'}
+          {boss || source === 'live'
+            ? 'All folders are up to date.'
+            : source === 'fallback'
+              ? 'Folder unavailable, showing r/all'
+              : 'Working Offline (showing cached items)'}
           <span className="status-sep" />
           Connected to: Microsoft Exchange
         </span>

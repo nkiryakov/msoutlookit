@@ -11,7 +11,7 @@ const PROXIES = [
   (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
 ];
 
-const TIMEOUT_MS = 7000;
+const TIMEOUT_MS = 5000;
 
 async function fetchJson(url) {
   let lastError;
@@ -35,24 +35,37 @@ function listingUrl(subreddit, sort, after) {
   return `${REDDIT}${path}?${params}`;
 }
 
-// Returns { posts, after, offline }. Falls back to bundled sample data when
-// Reddit can't be reached so the UI is never empty.
+// Direct JSON feed used when the requested folder can't be loaded.
+export const FALLBACK_FEED = `${REDDIT}/r/all/hot.json?limit=25`;
+
+function parseListing(data) {
+  return {
+    posts: data.data.children.filter((c) => c.kind === 't3').map((c) => toEmail(c.data)),
+    after: data.data.after,
+  };
+}
+
+// Returns { posts, after, source } where source is:
+//   'live'     - the requested folder loaded from Reddit
+//   'fallback' - the folder failed, so r/all/hot.json was shown instead
+//   'offline'  - Reddit was unreachable, so bundled sample data is shown
 export async function fetchPosts(subreddit, sort = 'hot', after = null) {
   try {
-    const data = await fetchJson(listingUrl(subreddit, sort, after));
-    return {
-      posts: data.data.children.filter((c) => c.kind === 't3').map((c) => toEmail(c.data)),
-      after: data.data.after,
-      offline: false,
-    };
+    return { ...parseListing(await fetchJson(listingUrl(subreddit, sort, after))), source: 'live' };
+  } catch (err) {
+    console.warn('Could not load folder, trying r/all feed:', err);
+  }
+  if (after) return { posts: [], after: null, source: 'offline' };
+  try {
+    // The fallback feed is a single page, so pagination is disabled.
+    return { ...parseListing(await fetchJson(FALLBACK_FEED)), after: null, source: 'fallback' };
   } catch (err) {
     console.warn('Falling back to sample data:', err);
-    if (after) return { posts: [], after: null, offline: true };
-    const posts = samplePosts
-      .filter((p) => !subreddit || p.subreddit.toLowerCase() === subreddit.toLowerCase())
-      .map(toEmail);
-    return { posts: posts.length ? posts : samplePosts.map(toEmail), after: null, offline: true };
   }
+  const posts = samplePosts
+    .filter((p) => !subreddit || p.subreddit.toLowerCase() === subreddit.toLowerCase())
+    .map(toEmail);
+  return { posts: posts.length ? posts : samplePosts.map(toEmail), after: null, source: 'offline' };
 }
 
 export async function fetchComments(post) {

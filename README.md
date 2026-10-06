@@ -16,7 +16,7 @@ Inspired by Peter Cottle's original MSOutlookit and [Leigh Robert Abbott's moder
 - Draggable Reply, Reply All, Forward and New Email windows. Nothing is actually sent.
 - **Boss key:** press `Esc` to swap everything for a boring inbox of work emails, and press it again to come back
 - Keyboard shortcuts: `j`/`k` or the arrow keys to move between messages, `r` to refresh, `Delete` to hide
-- If Reddit can't be reached, the app shows bundled sample posts and the status bar reads "Working Offline"
+- If a folder can't be loaded, the app falls back to the direct feed `https://www.reddit.com/r/all/hot.json?limit=25`, and the status bar reads "Folder unavailable, showing r/all". If that fails too, it shows bundled sample posts and the status bar reads "Working Offline".
 
 ## Development
 
