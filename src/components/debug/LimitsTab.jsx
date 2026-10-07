@@ -9,6 +9,7 @@ const KNOWN = [
   ['Replies per request', 'A thread request returns up to "limit" comments down to "depth" levels; the rest come back as "load more" placeholders. Logged-out requests have commonly been capped at 500.'],
   ['More replies', '/api/morechildren takes at most 100 comment ids per call, and Reddit asks for one call at a time.'],
   ['Rate limit', 'Logged-out access has been about 10 requests a minute per IP; approved OAuth apps get 100 a minute.'],
+  ['RSS', 'Honors "limit" up to 100. Server IPs get 429 (rate limited) after 2 or 3 RSS requests.'],
   ['Access', 'Since late May 2026 Reddit answers logged-out .json requests with 403. Logged-in sessions and OAuth still work. RSS feeds still answer, but without a CORS header, so a browser needs a proxy to read them; corsproxy.io now requires an API key.'],
 ];
 

@@ -71,8 +71,20 @@ for feed in "${FEEDS[@]}"; do
 done
 
 # ---- RSS limits, measured directly (RSS still answers server requests) ------
+# Reddit allows server IPs only a few RSS requests before answering 429, so
+# these requests are spaced out and retried once after a pause.
 
-fetch() { curl -sS -m 20 -A "$UA" -o "$WORK/body" -w '%{http_code}' "$1" 2>/dev/null || echo ERR; }
+GAP=10
+fetch_once() { curl -sS -m 20 -A "$UA" -o "$WORK/body" -w '%{http_code}' "$1" 2>/dev/null || echo ERR; }
+fetch() {
+  local code
+  code=$(fetch_once "$1")
+  if [ "$code" = "429" ]; then
+    sleep 60
+    code=$(fetch_once "$1")
+  fi
+  echo "$code"
+}
 entries() { grep -o '<entry>' "$WORK/body" | wc -l | tr -d ' '; }
 post_ids() { grep -o '<id>t3_[a-z0-9]*</id>' "$WORK/body" | sed -e 's/<id>//' -e 's/<\/id>//'; }
 
@@ -82,7 +94,7 @@ row "|---|---|---|"
 for limit in 25 100 101 500 1000; do
   code=$(fetch "https://www.reddit.com/r/all/hot/.rss?limit=$limit")
   row "| /r/all/hot/.rss?limit=$limit | $code | $(entries) |"
-  sleep 3
+  sleep "$GAP"
 done
 
 row ""
@@ -101,17 +113,18 @@ for page in $(seq 1 12); do
   row "| $page | $code | $n | $new | $total | ${last:--} |"
   if [ -z "$last" ] || [ "$new" = "0" ]; then break; fi
   after=$last
-  sleep 3
+  sleep "$GAP"
 done
 
 row ""
 row "| RSS comments feed | HTTP | Entries |"
 row "|---|---|---|"
+sleep "$GAP"
 fetch "https://www.reddit.com/r/AskReddit/top/.rss?t=day&limit=1" >/dev/null
 link=$(grep -o '<link href="https://www.reddit.com/r/[^"]*/comments/[^"]*"' "$WORK/body" | head -1 | sed -e 's/<link href="//' -e 's/"$//')
 if [ -n "$link" ]; then
   for limit in 25 100 500; do
-    sleep 3
+    sleep "$GAP"
     code=$(fetch "${link}.rss?limit=$limit")
     row "| ${link#https://www.reddit.com}.rss?limit=$limit | $code | $(entries) |"
   done

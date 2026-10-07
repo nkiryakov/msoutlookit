@@ -60,8 +60,9 @@ The **Reddit access probe** workflow (Actions tab → Reddit access probe → Ru
 | Replies per thread request | up to `limit` comments and `depth` levels; the rest become "load more" placeholders |
 | More replies | `/api/morechildren` takes at most 100 comment ids per call, one call at a time |
 | Rate limit | about 10 requests a minute when logged out; 100 a minute for approved OAuth apps |
+| RSS | honors `limit` up to 100 (measured); server IPs get `429` after 2 or 3 requests |
 
-**Access in 2026:** since late May 2026 Reddit answers logged-out `.json` requests with `403 Forbidden`. The probe (October 2026) found that from a server, JSON and JSONP get 403 while RSS still works, but RSS has no CORS header, so a browser can only read it through a proxy. corsproxy.io now requires an API key, and allorigins.win and codetabs.com mostly time out. In practice that leaves JSONP while logged in to Reddit, or a small proxy of your own set up as the Custom proxy.
+**Access in 2026:** since late May 2026 Reddit answers logged-out `.json` requests with `403 Forbidden`. The probe (October 2026) found that from a server, JSON and JSONP get 403 while RSS still works, but RSS has no CORS header, so a browser can only read it through a proxy, and server IPs are rate limited after a couple of RSS requests. corsproxy.io now requires an API key, and allorigins.win and codetabs.com mostly time out. In practice that leaves JSONP while logged in to Reddit, or a small proxy running on your own home connection set up as the Custom proxy (a cloud-hosted proxy would hit the same server rate limit).
 
 ## Development
 
