@@ -47,6 +47,7 @@ export default function MessageList({
           <span>Working offline: Reddit couldn't be reached, so these are sample items.</span>
           <button type="button" className="link-btn" onClick={onRetry}>Retry</button>
           <button type="button" className="link-btn" onClick={onOpenDebug}>Why?</button>
+          <button type="button" className="link-btn" onClick={() => onOpenDebug('sources')}>Connect a Reddit tab</button>
         </div>
       )}
       <div className="ml-scroll" ref={listRef} onScroll={onScroll} role="listbox" aria-label="Message list">

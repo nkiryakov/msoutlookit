@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icon from '../Icons.jsx';
 import LimitsTab from './LimitsTab.jsx';
 import RequestsTab from './RequestsTab.jsx';
@@ -21,9 +21,13 @@ function initialTab() {
 }
 
 // Floating, draggable and resizable window with the request log, source
-// settings and limit probes.
-export default function DebugConsole({ onClose, onToast, folder, sort, post, summary }) {
-  const [tab, setTab] = useState(initialTab);
+// settings and limit probes. `tabRequest` ({ tab, n }) switches to a tab, e.g.
+// from a link elsewhere in the app, even while the console is already open.
+export default function DebugConsole({ onClose, onToast, folder, sort, post, summary, tabRequest }) {
+  const [tab, setTab] = useState(() => (TABS.some(([id]) => id === tabRequest?.tab) ? tabRequest.tab : initialTab()));
+  useEffect(() => {
+    if (TABS.some(([id]) => id === tabRequest?.tab)) setTab(tabRequest.tab);
+  }, [tabRequest]);
   // Open over the reading pane, leaving the folders and message list visible.
   const [size] = useState(() => ({
     w: Math.max(420, Math.min(860, window.innerWidth - 680, window.innerWidth - 32)),
@@ -77,7 +81,7 @@ export default function DebugConsole({ onClose, onToast, folder, sort, post, sum
       </div>
       <div className="debug-body">
         {tab === 'requests' && <RequestsTab summary={summary} onToast={onToast} />}
-        {tab === 'sources' && <SourcesTab folder={folder} sort={sort} />}
+        {tab === 'sources' && <SourcesTab folder={folder} sort={sort} onToast={onToast} />}
         {tab === 'limits' && <LimitsTab folder={folder} sort={sort} post={post} />}
       </div>
     </div>

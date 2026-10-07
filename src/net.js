@@ -1,5 +1,6 @@
 import { getSettings } from './settings.js';
 import { addAttempt, updateAttempt } from './debugLog.js';
+import { relayAvailable, relayFetch } from './relay.js';
 
 // Transport layer: gets a URL's contents through one of several "sources"
 // (direct, JSONP, CORS proxies), logging every attempt for the debug console.
@@ -24,6 +25,13 @@ function customUrl(url, template) {
 
 export const STRATEGIES = [
   {
+    id: 'relay',
+    label: 'Reddit tab',
+    detail: 'Asks a Reddit tab you connected with the bookmarklet (set up above). The tab fetches from reddit.com itself, with your login, so there is no CORS and no proxy. Needs the tab to stay open; RSS also needs it to be on www.reddit.com.',
+    transport: 'relay',
+    build: (url) => url,
+  },
+  {
     id: 'direct',
     label: 'Direct',
     detail: 'fetch() straight to www.reddit.com, without cookies.',
@@ -33,7 +41,7 @@ export const STRATEGIES = [
   {
     id: 'jsonp',
     label: 'JSONP',
-    detail: 'Loads the JSON as a <script> with ?jsonp=. Not subject to CORS, and sends your reddit.com cookies, so it can work while you are logged in to Reddit in this browser. JSON only.',
+    detail: 'Loads the JSON as a <script> with ?jsonp=. Not subject to CORS, but your Reddit login only goes along if its cookie is SameSite=None and the browser sends cross-site cookies (Chrome does, Safari and Firefox do not). Otherwise Reddit sees you logged out. JSON only.',
     transport: 'jsonp',
     jsonOnly: true,
     build: (url) => url,
@@ -98,9 +106,10 @@ const SLOW_KEY = 'msoutlookit:slow';
 const stats = {};
 export const getStats = () => stats;
 
+// The Reddit tab is never benched: whether it answers is tracked by the connection itself (relay.js).
 function recentlyTimedOut(id, now) {
   const s = stats[id];
-  return !!s && s.failType === 'timeout' && s.failAt > (s.okAt || 0) && now - s.failAt < SLOW_PENALTY_MS;
+  return id !== 'relay' && !!s && s.failType === 'timeout' && s.failAt > (s.okAt || 0) && now - s.failAt < SLOW_PENALTY_MS;
 }
 
 try {
@@ -154,6 +163,7 @@ function rememberGood(format, id) {
 }
 
 export function isConfigured(id, settings = getSettings()) {
+  if (id === 'relay') return relayAvailable();
   return id !== 'custom' || !!customUrl('https://www.reddit.com/', settings.customProxy);
 }
 
@@ -220,8 +230,14 @@ const STATUS_HINTS = {
   429: 'rate limited: too many requests, wait a minute',
 };
 
-function statusMessage(res) {
-  const hint = STATUS_HINTS[res.status] || (res.status >= 500 ? 'server or proxy error' : '');
+// What a refusal means when it came back through the Reddit tab, which is logged in and same-origin.
+const RELAY_HINTS = {
+  401: 'Reddit wants a login: log in in the Reddit tab, reload it and click the bookmarklet again',
+  403: 'Reddit refused even your own Reddit tab: log in there, reload it and click the bookmarklet again',
+};
+
+function statusMessage(res, strategyId) {
+  const hint = (strategyId === 'relay' && RELAY_HINTS[res.status]) || STATUS_HINTS[res.status] || (res.status >= 500 ? 'server or proxy error' : '');
   return `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}${hint ? ` (${hint})` : ''}`;
 }
 
@@ -311,6 +327,20 @@ async function attempt(strategy, url, { format, parse, validate, groupId, signal
     if (strategy.transport === 'jsonp') {
       data = await jsonp(requestUrl, ctrl.signal);
       info.bytes = JSON.stringify(data)?.length ?? null;
+    } else if (strategy.transport === 'relay') {
+      let res;
+      try {
+        res = await relayFetch(requestUrl, ctrl.signal);
+      } catch (e) {
+        // An abort carries its own reason; anything else is the relay saying why it can't help.
+        throw ctrl.signal.aborted ? e : new NetError(e.relayType || 'relay', e.message);
+      }
+      info.httpStatus = res.status;
+      info.contentType = res.contentType;
+      info.rate = res.rate;
+      info.bytes = res.text.length;
+      if (!res.ok) throw new NetError('http', statusMessage(res, strategy.id), { snippet: res.text.slice(0, 400) });
+      data = parse(res.text);
     } else {
       const res = await fetch(requestUrl, { signal: ctrl.signal, credentials: strategy.credentials || 'omit' });
       info.httpStatus = res.status;
@@ -318,7 +348,7 @@ async function attempt(strategy, url, { format, parse, validate, groupId, signal
       info.rate = readRateLimit(res.headers);
       const text = await res.text();
       info.bytes = text.length;
-      if (!res.ok) throw new NetError('http', statusMessage(res), { snippet: text.slice(0, 400) });
+      if (!res.ok) throw new NetError('http', statusMessage(res, strategy.id), { snippet: text.slice(0, 400) });
       data = parse(text);
     }
     const problem = validate(data);
