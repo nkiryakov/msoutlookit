@@ -12,6 +12,7 @@ import {
   folderLabel, patchNode, replaceNode,
 } from './reddit.js';
 import { FORMAT_LABELS, strategyLabel } from './net.js';
+import { useRelay } from './relay.js';
 import { getSettings, updateSettings, useSettings } from './settings.js';
 import { bossEmails } from './sampleData.js';
 
@@ -53,6 +54,7 @@ export default function App() {
   const [readingPane, setReadingPane] = usePersisted('readingPane', true);
   const [readList, setReadList] = usePersisted('read', []);
   const settings = useSettings();
+  const relay = useRelay();
 
   const [folder, setFolder] = useState(null);
   const [sort, setSort] = useState('hot');
@@ -69,6 +71,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [boss, setBoss] = useState(false);
   const [debugOpen, setDebugOpen] = useState(() => new URLSearchParams(window.location.search).has('debug'));
+  const [tabRequest, setTabRequest] = useState(null);
   const [composers, setComposers] = useState([]);
   const [toast, setToast] = useState(null);
   const [addingFolder, setAddingFolder] = useState(false);
@@ -126,6 +129,12 @@ export default function App() {
 
   const cancelLoad = () => postsCtrl.current?.abort('cancelled');
   const reload = () => load(folder, sort);
+
+  // A Reddit tab that connects after the folder fell back to sample items: load it again now,
+  // rather than waiting for a click on Retry.
+  useEffect(() => {
+    if (relay.status === 'connected' && feed.format === 'sample') load(folder, sort);
+  }, [relay.connectedAt]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -243,7 +252,11 @@ export default function App() {
   };
 
   const unread = visible.filter((p) => !readIds.has(p.id)).length;
-  const openDebug = () => setDebugOpen(true);
+  // Also used as a click handler, so only a string means "open this tab".
+  const openDebug = (tab) => {
+    if (typeof tab === 'string') setTabRequest({ tab, n: Date.now() });
+    setDebugOpen(true);
+  };
   const probePost = selected && !selected.offline ? selected : posts.find((p) => !p.offline) || null;
   const debugSummary = [
     ['Folder', `r/${folder || 'all'} · ${sort}`],
@@ -253,6 +266,12 @@ export default function App() {
       ? `${selected.id} · replies ${thread.status}${thread.status === 'ok' ? `: ${countComments(thread.nodes)} via ${strategyLabel(thread.via)} · ${FORMAT_LABELS[thread.format] || thread.format}` : ''}`
       : 'none'],
     ['Settings', `${settings.mode}, ${settings.timeoutMs / 1000}s timeout, formats ${['json', 'plain', 'rss'].filter((f) => settings.formats[f]).join('/') || 'none'}, ${settings.postLimit} posts per page`],
+    ['Reddit tab', {
+      connected: `connected to ${relay.host}`,
+      connecting: 'connecting…',
+      lost: `not answering: ${relay.error}`,
+      none: relay.error ? `not connected: ${relay.error}` : 'not connected',
+    }[relay.status]],
   ];
 
   return (
@@ -357,6 +376,7 @@ export default function App() {
           sort={sort}
           post={probePost}
           summary={debugSummary}
+          tabRequest={tabRequest}
         />
       )}
       {composers.map((c, i) => (

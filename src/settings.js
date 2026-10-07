@@ -11,8 +11,11 @@ export const DEFAULT_SETTINGS = {
   mode: 'staggered',
   staggerMs: 1500,
   timeoutMs: 6000,
-  order: ['direct', 'jsonp', 'corsproxy', 'allorigins', 'codetabs', 'custom', 'old', 'directCookies'],
+  // The Reddit tab comes first: when it is connected it is the only source that works reliably, and
+  // when it isn't it is skipped.
+  order: ['relay', 'direct', 'jsonp', 'corsproxy', 'allorigins', 'codetabs', 'custom', 'old', 'directCookies'],
   enabled: {
+    relay: true,
     direct: true,
     jsonp: true,
     corsproxy: true,
@@ -34,18 +37,29 @@ export const DEFAULT_SETTINGS = {
   commentSort: 'confidence',
 };
 
+// Keeps newly added sources in a saved order, placed before the next source that follows them by
+// default (so a new first source starts first) rather than at the end.
+function mergeOrder(savedOrder) {
+  const order = (savedOrder || []).filter((id) => DEFAULT_SETTINGS.order.includes(id));
+  DEFAULT_SETTINGS.order.forEach((id, i) => {
+    if (order.includes(id)) return;
+    const next = DEFAULT_SETTINGS.order.slice(i + 1).find((other) => order.includes(other));
+    if (next) order.splice(order.indexOf(next), 0, id);
+    else order.push(id);
+  });
+  return order;
+}
+
 function read() {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (!saved) return DEFAULT_SETTINGS;
-    const order = (saved.order || []).filter((id) => DEFAULT_SETTINGS.order.includes(id));
     return {
       ...DEFAULT_SETTINGS,
       ...saved,
       enabled: { ...DEFAULT_SETTINGS.enabled, ...saved.enabled },
       formats: { ...DEFAULT_SETTINGS.formats, ...saved.formats },
-      // Keep newly added sources in the list.
-      order: [...order, ...DEFAULT_SETTINGS.order.filter((id) => !order.includes(id))],
+      order: mergeOrder(saved.order),
     };
   } catch {
     return DEFAULT_SETTINGS;

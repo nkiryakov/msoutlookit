@@ -3,6 +3,7 @@ import { useLog } from '../../debugLog.js';
 import { STRATEGIES, STRATEGY, getLastGood, getStats } from '../../net.js';
 import { testAllSources } from '../../probes.js';
 import { resetSettings, updateSettings, useSettings } from '../../settings.js';
+import RelayPanel from './RelayPanel.jsx';
 import { NumberField, Pill, fmtMs, shortError } from './util.jsx';
 
 const MODES = [
@@ -29,7 +30,7 @@ function TestCell({ result }) {
   return <span title={result.error}><Pill status="error">{shortError(result.type, result.error)}</Pill></span>;
 }
 
-export default function SourcesTab({ folder, sort }) {
+export default function SourcesTab({ folder, sort, onToast }) {
   const settings = useSettings();
   useLog(); // re-render as requests finish, so the health column stays current
   const lastGood = getLastGood();
@@ -92,6 +93,8 @@ export default function SourcesTab({ folder, sort }) {
 
   return (
     <div className="dbg-tab">
+      <RelayPanel onToast={onToast} />
+
       <section className="dbg-section">
         <h3>How sources are tried</h3>
         <div className="dbg-radios">
@@ -230,7 +233,7 @@ export default function SourcesTab({ folder, sort }) {
           <p className="dbg-note">
             {anyOk
               ? '"Use what worked" puts the working sources first, fastest first, and turns off any format that failed everywhere.'
-              : 'Nothing worked from this browser. Logging in to reddit.com in this browser may let JSONP work; otherwise a proxy you run yourself is the remaining option.'}
+              : 'Nothing worked from this browser. Connect a Reddit tab with the bookmarklet above; a proxy you run yourself on a home connection is the other option.'}
           </p>
         )}
       </section>

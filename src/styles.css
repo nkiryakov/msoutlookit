@@ -385,6 +385,12 @@ kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 
 .dbg-radio input, .dbg-check input { margin-top: 2px; }
 .dbg-dim { color: var(--text-3); font-size: 12px; }
 .dbg-note { margin: 0; font-size: 12.5px; color: var(--text-2); }
+.dbg-steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 12.5px; color: var(--text-2); }
+.dbg-bookmarklet {
+  display: inline-block; padding: 1px 9px; border: 1px dashed var(--accent); border-radius: 4px;
+  color: var(--accent); font-weight: 600; text-decoration: none; cursor: grab; user-select: none;
+}
+.dbg-bookmarklet:hover { background: var(--bg-selected); }
 .dbg-error { color: var(--err); font-size: 12.5px; overflow-wrap: anywhere; }
 .dbg-mono { font-family: var(--mono); font-size: 12px; }
 .dbg-groups { display: grid; gap: 4px; }

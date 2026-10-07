@@ -16,7 +16,7 @@ export function fmtClock(ts) {
 
 const PILL_TEXT = { ok: 'OK', error: 'Failed', pending: 'Running', cancelled: 'Cancelled', aborted: 'Stopped', skipped: 'Skipped' };
 
-const ERROR_TEXT = { network: 'CORS / network', timeout: 'timeout', blocked: 'blocked', shape: 'wrong data', offline: 'offline' };
+const ERROR_TEXT = { network: 'CORS / network', timeout: 'timeout', blocked: 'blocked', shape: 'wrong data', offline: 'offline', relay: 'no Reddit tab' };
 
 // A few words for an error type, e.g. "HTTP 403" or "CORS / network".
 export function shortError(type, message = '') {
