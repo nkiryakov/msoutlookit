@@ -34,6 +34,7 @@ const paths = {
   help: 'M10 18a8 8 0 100-16 8 8 0 000 16z M7.5 7.5a2.5 2.5 0 114 2c-1 .6-1.5 1-1.5 2.5 M10 14.5v.5',
   external: 'M11 3h6v6 M17 3l-8 8 M14 12v5H3V6h5',
   more: 'M4 10h.01 M10 10h.01 M16 10h.01',
+  bug: 'M7 6a3 3 0 016 0 M6 8h8v5a4 4 0 01-8 0z M10 9v8 M2 10h4 M14 10h4 M3 16l3-2 M17 16l-3-2 M4 5l2 3 M16 5l-2 3',
 };
 
 export default function Icon({ name, size = 16, className = '', title }) {

@@ -3,7 +3,11 @@ import Icon from './Icons.jsx';
 
 // A floating, draggable "new message" window. Nothing is actually sent.
 export default function ComposeWindow({ draft, index, onClose, onSend, onFocus, zIndex }) {
-  const [pos, setPos] = useState({ x: 120 + index * 30, y: 90 + index * 30 });
+  // Cascade new windows, but keep them on screen (the CSS width is min(640px, 100vw - 32px)).
+  const [pos, setPos] = useState(() => ({
+    x: Math.max(8, Math.min(120 + index * 30, window.innerWidth - Math.min(640, window.innerWidth - 32) - 8)),
+    y: Math.max(8, Math.min(90 + index * 30, window.innerHeight - Math.min(460, window.innerHeight - 32) - 8)),
+  }));
   const [to, setTo] = useState(draft.to || '');
   const [subject, setSubject] = useState(draft.subject || '');
   const [body, setBody] = useState(draft.body || '');

@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import Icon from './Icons.jsx';
-import { avatarColor, disguiseName, emailFor, formatDate, initials, sanitize } from '../reddit.js';
+import LoadingLine from './LoadingLine.jsx';
+import { avatarColor, countComments, disguiseName, emailFor, formatDate, initials, sanitize } from '../reddit.js';
+
+const COMMENT_SORTS = [
+  ['confidence', 'Best'], ['top', 'Top'], ['new', 'New'], ['controversial', 'Controversial'], ['old', 'Old'], ['qa', 'Q&A'],
+];
 
 function Sender({ username, realNames, size = 36 }) {
   const name = disguiseName(username);
@@ -18,7 +23,35 @@ function Html({ html }) {
   return <div className="rp-html" dangerouslySetInnerHTML={{ __html: clean }} />;
 }
 
-function Comment({ c, realNames, depth }) {
+// Placeholder for replies Reddit left out of the thread.
+function MoreReplies({ node, onLoadMore, onOpenDebug }) {
+  if (node.loading) {
+    return <div className="more-replies"><span className="spinner" /> Loading replies…</div>;
+  }
+  const label = node.isContinue
+    ? 'Continue this thread'
+    : `Load ${node.count} more ${node.count === 1 ? 'reply' : 'replies'}`;
+  return (
+    <div className="more-replies">
+      <button type="button" className="link-btn" onClick={() => onLoadMore(node)}>
+        <Icon name={node.isContinue ? 'chevronRight' : 'chevronDown'} size={12} /> {label}
+      </button>
+      {node.error && (
+        <span className="more-error">
+          Couldn't load: {node.error}
+          <button type="button" className="link-btn" onClick={onOpenDebug}>Details</button>
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Node({ node, realNames, depth, onLoadMore, onOpenDebug }) {
+  if (node.type === 'more') return <MoreReplies node={node} onLoadMore={onLoadMore} onOpenDebug={onOpenDebug} />;
+  return <Comment c={node} realNames={realNames} depth={depth} onLoadMore={onLoadMore} onOpenDebug={onOpenDebug} />;
+}
+
+function Comment({ c, realNames, depth, onLoadMore, onOpenDebug }) {
   const [collapsed, setCollapsed] = useState(depth >= 4);
   const name = realNames ? `u/${c.author}` : disguiseName(c.author);
   return (
@@ -31,11 +64,14 @@ function Comment({ c, realNames, depth }) {
             {c.isOp && <span className="tag">Sender</span>}
             {!realNames && <span className="reply-addr">&lt;{emailFor(c.author)}&gt;</span>}
           </div>
-          <div className="reply-date">{formatDate(c.created, true)} · Importance: {c.score}</div>
+          <div className="reply-date">
+            {formatDate(c.created, true)}
+            {c.score != null && ` · Importance: ${c.score}`}
+          </div>
         </div>
         <button type="button" className="reply-toggle" onClick={() => setCollapsed(!collapsed)} aria-expanded={!collapsed}>
           <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} size={12} />
-          {collapsed ? `Show (${countReplies(c) + 1})` : 'Hide'}
+          {collapsed ? `Show (${countComments(c.replies) + 1})` : 'Hide'}
         </button>
       </div>
       {!collapsed && (
@@ -44,7 +80,7 @@ function Comment({ c, realNames, depth }) {
           {c.replies.length > 0 && (
             <div className="reply-children">
               {c.replies.map((r) => (
-                <Comment key={r.id} c={r} realNames={realNames} depth={depth + 1} />
+                <Node key={r.key} node={r} realNames={realNames} depth={depth + 1} onLoadMore={onLoadMore} onOpenDebug={onOpenDebug} />
               ))}
             </div>
           )}
@@ -54,11 +90,10 @@ function Comment({ c, realNames, depth }) {
   );
 }
 
-function countReplies(c) {
-  return c.replies.reduce((n, r) => n + 1 + countReplies(r), 0);
-}
-
-export default function ReadingPane({ post, comments, commentsLoading, realNames, showImages, onReply, onReplyAll, onForward, onBack }) {
+export default function ReadingPane({
+  post, thread, commentSort, onSortChange, onLoadMore, onRetryComments, onOpenDebug,
+  realNames, showImages, onReply, onReplyAll, onForward, onBack,
+}) {
   // Remounted per post (see `key` in App), so this resets on selection change.
   const [revealImage, setRevealImage] = useState(false);
 
@@ -76,6 +111,7 @@ export default function ReadingPane({ post, comments, commentsLoading, realNames
 
   const name = realNames ? `u/${post.author}` : disguiseName(post.author);
   const imageVisible = post.isImage && (showImages || revealImage);
+  const loaded = countComments(thread.nodes);
 
   return (
     <section className="reading-pane" aria-label="Reading pane">
@@ -132,16 +168,39 @@ export default function ReadingPane({ post, comments, commentsLoading, realNames
           <a href={post.permalink} target="_blank" rel="noopener noreferrer">
             <Icon name="external" size={12} /> Open original
           </a>
-          <span>Importance: {post.score}</span>
-          <span>{post.numComments} replies</span>
+          {post.score != null && <span>Importance: {post.score}</span>}
+          {post.numComments != null && <span>{post.numComments} replies</span>}
         </div>
 
         <div className="conversation">
-          <div className="conversation-title">Conversation ({post.numComments})</div>
-          {commentsLoading && <div className="ml-loading"><span className="spinner" /> Downloading messages…</div>}
-          {!commentsLoading && comments.length === 0 && <p className="muted">No replies yet.</p>}
-          {comments.map((c) => (
-            <Comment key={c.id} c={c} realNames={realNames} depth={0} />
+          <div className="conversation-head">
+            <span className="conversation-title">
+              Conversation
+              {thread.status === 'ok' && ` · ${loaded}${post.numComments != null ? ` of ${post.numComments}` : ''} ${loaded === 1 ? 'reply' : 'replies'}`}
+              {thread.flat && ' (flat list from RSS)'}
+            </span>
+            <label className="conversation-sort">
+              Arrange by
+              <select value={commentSort} onChange={(e) => onSortChange(e.target.value)}>
+                {COMMENT_SORTS.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </label>
+          </div>
+          {thread.status === 'loading' && (
+            <LoadingLine purpose="comments" text="Downloading messages" onDetails={onOpenDebug} />
+          )}
+          {thread.status === 'error' && (
+            <div className="ml-note error">
+              Couldn't download the replies: {thread.error}
+              <div>
+                <button type="button" className="link-btn" onClick={onRetryComments}>Retry</button>
+                <button type="button" className="link-btn" onClick={onOpenDebug}>Details</button>
+              </div>
+            </div>
+          )}
+          {thread.status === 'ok' && thread.nodes.length === 0 && <p className="muted">No replies yet.</p>}
+          {thread.nodes.map((n) => (
+            <Node key={n.key} node={n} realNames={realNames} depth={0} onLoadMore={onLoadMore} onOpenDebug={onOpenDebug} />
           ))}
         </div>
       </div>

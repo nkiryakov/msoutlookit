@@ -37,7 +37,7 @@ export default function Ribbon(props) {
   const {
     hasSelection, sort, onSort, onNewEmail, onReply, onReplyAll, onForward, onDelete, onRefresh, loading,
     readingPane, onToggleReadingPane, theme, onToggleTheme, realNames, onToggleRealNames, showImages,
-    onToggleImages, onNewFolder, onBoss, onMarkAllRead,
+    onToggleImages, onNewFolder, onBoss, onMarkAllRead, onOpenDebug,
   } = props;
   const [tab, setTab] = useState('Home');
 
@@ -115,13 +115,18 @@ export default function Ribbon(props) {
           </>
         )}
         {tab === 'Help' && (
-          <Group label="Keyboard">
-            <div className="rb-help">
-              <div><kbd>j</kbd>/<kbd>k</kbd> or <kbd>↓</kbd>/<kbd>↑</kbd> next / previous message</div>
-              <div><kbd>Esc</kbd> boss mode: instantly show boring work email</div>
-              <div><kbd>r</kbd> refresh &nbsp; <kbd>Delete</kbd> hide message</div>
-            </div>
-          </Group>
+          <>
+            <Group label="Troubleshooting">
+              <Btn big icon="bug" label="Debug Console" onClick={onOpenDebug} />
+            </Group>
+            <Group label="Keyboard">
+              <div className="rb-help">
+                <div><kbd>j</kbd>/<kbd>k</kbd> or <kbd>↓</kbd>/<kbd>↑</kbd> next / previous message</div>
+                <div><kbd>Esc</kbd> boss mode: instantly show boring work email</div>
+                <div><kbd>r</kbd> refresh &nbsp; <kbd>Delete</kbd> hide message &nbsp; <kbd>`</kbd> debug console</div>
+              </div>
+            </Group>
+          </>
         )}
       </div>
     </div>

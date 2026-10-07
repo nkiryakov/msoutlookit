@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Icon from './Icons.jsx';
+import LoadingLine from './LoadingLine.jsx';
 import { avatarColor, disguiseName, folderLabel, formatDate, initials } from '../reddit.js';
 
 function groupLabel(utc) {
@@ -13,7 +14,8 @@ function groupLabel(utc) {
 }
 
 export default function MessageList({
-  posts, selectedId, onSelect, readIds, realNames, loading, hasMore, onLoadMore, folder, error, filterText,
+  posts, selectedId, onSelect, readIds, realNames, loading, hasMore, onLoadMore, folder, filterText,
+  feed, moreError, stopped, onCancel, onRetry, onOpenDebug,
 }) {
   const listRef = useRef(null);
 
@@ -25,9 +27,10 @@ export default function MessageList({
 
   const onScroll = (e) => {
     const el = e.currentTarget;
-    if (hasMore && !loading && el.scrollTop + el.clientHeight > el.scrollHeight - 200) onLoadMore();
+    if (hasMore && !loading && !moreError && el.scrollTop + el.clientHeight > el.scrollHeight - 200) onLoadMore();
   };
 
+  const offline = feed?.format === 'sample';
   let lastGroup = null;
   return (
     <section className="message-list" aria-label="Messages">
@@ -38,10 +41,21 @@ export default function MessageList({
         </div>
         <div className="ml-folder">{folderLabel(folder)}</div>
       </div>
+      {offline && !loading && (
+        <div className="infobar" role="status">
+          <Icon name="help" size={14} />
+          <span>Working offline: Reddit couldn't be reached, so these are sample items.</span>
+          <button type="button" className="link-btn" onClick={onRetry}>Retry</button>
+          <button type="button" className="link-btn" onClick={onOpenDebug}>Why?</button>
+        </div>
+      )}
       <div className="ml-scroll" ref={listRef} onScroll={onScroll} role="listbox" aria-label="Message list">
         {posts.length === 0 && !loading && (
           <div className="ml-empty">
-            {filterText ? 'We didn’t find anything to show here.' : error || 'This folder is empty.'}
+            {filterText ? 'We didn’t find anything to show here.' : stopped ? 'Stopped before anything arrived.' : 'This folder is empty.'}
+            {stopped && !filterText && (
+              <div><button type="button" className="link-btn" onClick={onRetry}>Try again</button></div>
+            )}
           </div>
         )}
         {posts.map((p) => {
@@ -82,9 +96,25 @@ export default function MessageList({
             </div>,
           ];
         })}
-        {loading && <div className="ml-loading"><span className="spinner" /> Updating this folder…</div>}
-        {!loading && hasMore && posts.length > 0 && (
+        {loading && (
+          <LoadingLine purpose="posts" text={posts.length ? 'Loading more items' : 'Updating this folder'} onCancel={onCancel} onDetails={onOpenDebug} />
+        )}
+        {!loading && moreError && (
+          <div className="ml-note error">
+            Couldn't load more items: {moreError}
+            <div>
+              <button type="button" className="link-btn" onClick={onLoadMore}>Retry</button>
+              <button type="button" className="link-btn" onClick={onOpenDebug}>Details</button>
+            </div>
+          </div>
+        )}
+        {!loading && !moreError && hasMore && posts.length > 0 && (
           <button type="button" className="ml-more" onClick={onLoadMore}>Load more items</button>
+        )}
+        {!loading && !moreError && !hasMore && posts.length > 0 && !offline && !filterText && (
+          <div className="ml-note">
+            End of this folder: {posts.length} items. Reddit stops listings at about 1,000 posts.
+          </div>
         )}
       </div>
     </section>

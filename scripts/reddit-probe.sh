@@ -69,3 +69,52 @@ for feed in "${FEEDS[@]}"; do
     sleep 2
   done
 done
+
+# ---- RSS limits, measured directly (RSS still answers server requests) ------
+
+fetch() { curl -sS -m 20 -A "$UA" -o "$WORK/body" -w '%{http_code}' "$1" 2>/dev/null || echo ERR; }
+entries() { grep -o '<entry>' "$WORK/body" | wc -l | tr -d ' '; }
+post_ids() { grep -o '<id>t3_[a-z0-9]*</id>' "$WORK/body" | sed -e 's/<id>//' -e 's/<\/id>//'; }
+
+row ""
+row "| RSS page size | HTTP | Entries |"
+row "|---|---|---|"
+for limit in 25 100 101 500 1000; do
+  code=$(fetch "https://www.reddit.com/r/all/hot/.rss?limit=$limit")
+  row "| /r/all/hot/.rss?limit=$limit | $code | $(entries) |"
+  sleep 3
+done
+
+row ""
+row "| RSS page (limit=100, after=last id) | HTTP | Entries | New | Total unique | Next after |"
+row "|---|---|---|---|---|---|"
+: >"$WORK/seen"
+after=""
+for page in $(seq 1 12); do
+  code=$(fetch "https://www.reddit.com/r/all/hot/.rss?limit=100${after:+&after=$after}")
+  post_ids >"$WORK/page"
+  n=$(wc -l <"$WORK/page" | tr -d ' ')
+  new=$(sort -u "$WORK/page" | comm -23 - <(sort -u "$WORK/seen") | wc -l | tr -d ' ')
+  cat "$WORK/page" >>"$WORK/seen"
+  total=$(sort -u "$WORK/seen" | wc -l | tr -d ' ')
+  last=$(tail -1 "$WORK/page")
+  row "| $page | $code | $n | $new | $total | ${last:--} |"
+  if [ -z "$last" ] || [ "$new" = "0" ]; then break; fi
+  after=$last
+  sleep 3
+done
+
+row ""
+row "| RSS comments feed | HTTP | Entries |"
+row "|---|---|---|"
+fetch "https://www.reddit.com/r/AskReddit/top/.rss?t=day&limit=1" >/dev/null
+link=$(grep -o '<link href="https://www.reddit.com/r/[^"]*/comments/[^"]*"' "$WORK/body" | head -1 | sed -e 's/<link href="//' -e 's/"$//')
+if [ -n "$link" ]; then
+  for limit in 25 100 500; do
+    sleep 3
+    code=$(fetch "${link}.rss?limit=$limit")
+    row "| ${link#https://www.reddit.com}.rss?limit=$limit | $code | $(entries) |"
+  done
+else
+  row "| (couldn't find a post to test) | - | - |"
+fi
