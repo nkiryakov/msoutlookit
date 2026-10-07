@@ -1,0 +1,22 @@
+name: Reddit access probe
+
+# Tests every way the app can pull Reddit data and prints a table in the run
+# summary. Start it from the Actions tab with "Run workflow"; it also runs
+# whenever the probe itself changes.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/reddit-probe.yml
+      - scripts/reddit-probe.sh
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/reddit-probe.sh

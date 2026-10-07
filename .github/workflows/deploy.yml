@@ -23,25 +23,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Check Reddit feed (informational)
-        continue-on-error: true
-        run: |
-          check() {
-            local name="$1" url="$2"
-            local code cors posts
-            code=$(curl -sS -m 20 -A 'Mozilla/5.0 (X11; Linux x86_64) Chrome/130.0 Safari/537.36' \
-              -H 'Origin: https://example.github.io' -D headers.txt -o body.json -w '%{http_code}' "$url" || echo "ERR")
-            cors=$(grep -i '^access-control-allow-origin' headers.txt | tr -d '\r' | cut -d' ' -f2- || true)
-            posts=$(jq '.data.children | length' body.json 2>/dev/null || echo "-")
-            echo "| $name | $code | ${cors:-none} | $posts |" >> "$GITHUB_STEP_SUMMARY"
-            echo "$name: HTTP $code, CORS=${cors:-none}, posts=$posts"
-          }
-          echo "| Feed | HTTP | CORS header | Posts |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|---|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          check "r/all hot (direct)" "https://www.reddit.com/r/all/hot.json?limit=25"
-          check "front page (direct)" "https://www.reddit.com/hot.json?limit=25&raw_json=1"
-          check "r/all via corsproxy.io" "https://corsproxy.io/?url=https%3A%2F%2Fwww.reddit.com%2Fr%2Fall%2Fhot.json%3Flimit%3D25"
-          check "r/all via allorigins" "https://api.allorigins.win/raw?url=https%3A%2F%2Fwww.reddit.com%2Fr%2Fall%2Fhot.json%3Flimit%3D25"
       - run: npm ci
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3
